@@ -36,9 +36,31 @@ jobs:
       - name: Probe each server
         if: steps.pending.outputs.count != '0'
         run: |
-          jq -r '.[] | "\(.id) \(.address)"' pending.json | while read -r id address; do
-            if [[ ! "$id" =~ ^[0-9a-f-]{36}$ ]] || [[ ! "$address" =~ ^[a-z0-9.-]+:[0-9]{1,5}$ ]]; then
+          id_re='^[0-9a-f-]{36}$'
+          addr_re='^[a-z0-9.-]+:[0-9]{1,5}$'
+
+          run_probe() {
+            timeout 30 ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script probe.gd -- "$1" < /dev/null 2>&1
+          }
+
+          jq -r '.[] | [.id, .address] | @tsv' pending.json | while IFS=$'\t' read -r id address; do
+            if ! [[ "$id" =~ $id_re ]]; then
               echo "Skipping a malformed entry"
               continue
             fi
-            if timeout 30 ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script probe.gd -- "$address" <
+            if ! [[ "$address" =~ $addr_re ]]; then
+              echo "Skipping a malformed entry"
+              continue
+            fi
+            if run_probe "$address" | grep -q "PROBE OK"; then
+              ok=true
+            else
+              ok=false
+            fi
+            echo "Probe result: $ok"
+            curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/record_probe" \
+              -H "apikey: $SUPABASE_SERVICE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"p_id\":\"$id\",\"p_ok\":$ok}" > /dev/null
+          done
