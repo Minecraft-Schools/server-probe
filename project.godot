@@ -2,3 +2,6 @@ config_version=5
 
 [application]
 config/name="server-probe"
+
+[autoload]
+ProbeResponder="*res://probe_responder.gd"
