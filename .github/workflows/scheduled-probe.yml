@@ -1,0 +1,44 @@
+name: scheduled-probe
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: scheduled-probe
+  cancel-in-progress: false
+jobs:
+  probe-all:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the pending list
+        id: pending
+        run: |
+          curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/pending_probes" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" -d '{}' > pending.json
+          echo "count=$(jq length pending.json)" >> "$GITHUB_OUTPUT"
+          echo "Servers to probe: $(jq length pending.json)"
+
+      - name: Download Godot
+        if: steps.pending.outputs.count != '0'
+        run: |
+          curl -fL -o godot.zip https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.5.1-stable_linux.x86_64
+
+      - name: Probe each server
+        if: steps.pending.outputs.count != '0'
+        run: |
+          jq -r '.[] | "\(.id) \(.address)"' pending.json | while read -r id address; do
+            if [[ ! "$id" =~ ^[0-9a-f-]{36}$ ]] || [[ ! "$address" =~ ^[a-z0-9.-]+:[0-9]{1,5}$ ]]; then
+              echo "Skipping a malformed entry"
+              continue
+            fi
+            if timeout 30 ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script probe.gd -- "$address" <
