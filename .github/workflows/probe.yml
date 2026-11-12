@@ -1,0 +1,20 @@
+name: probe
+on:
+  workflow_dispatch:
+    inputs:
+      address:
+        description: "host:port to probe"
+        required: true
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          curl -fL -o godot.zip https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.5.1-stable_linux.x86_64
+      - name: Run probe
+        run: |
+          ./Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script probe.gd -- "${{ github.event.inputs.address }}"
