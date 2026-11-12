@@ -1,0 +1,17 @@
+name: udp-test
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send a UDP packet
+        run: |
+          python3 - <<'EOF'
+          import socket
+          q = b'\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01'
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.settimeout(5)
+          s.sendto(q, ('8.8.8.8', 53))
+          data, _ = s.recvfrom(512)
+          print('UDP works, reply bytes:', len(data))
+          EOF
