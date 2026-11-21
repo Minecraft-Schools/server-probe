@@ -1,7 +1,7 @@
 extends SceneTree
 
 const EXPECT_GAME_ID: String = "manor-game"
-const EXPECT_VERSION: int = 1
+const EXPECT_VERSION: int = 2
 const TIMEOUT: float = 8.0
 
 var _done: bool = false
